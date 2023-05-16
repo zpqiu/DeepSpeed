@@ -248,7 +248,7 @@ class BloomSelfAttention(DeepSpeedSelfAttention):
         offset = dist.get_rank() * self.num_attention_heads_per_partition if dist.is_initialized() else 0
         target_dtype = torch.float16 if self.config.dtype == torch.int8 else self.config.dtype
         attention_probs = self.softmax_func(attn_scores=attention_scores,
-                                            attn_mask=((1 - input_mask).to(target_dtype) * minus_inf),
+                                            attn_mask=((~input_mask).to(target_dtype) * minus_inf),
                                             alibi=alibi,
                                             triangular=(self.config.triangular_masking
                                                         and (attention_scores.shape[-2] > 1)),
