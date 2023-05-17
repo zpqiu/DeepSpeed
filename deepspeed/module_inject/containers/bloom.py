@@ -5,6 +5,7 @@
 
 from .base import *
 from .features.meta_tensor import MetaTensorContainer
+from .features.hybrid_engine import HybridEngineContainer
 from deepspeed.model_implementations.transformers.ds_bloom import DeepSpeedBloomInference
 from ..policy import TransformerPolicy
 from ..policy import transformer_param_names
@@ -15,7 +16,7 @@ from ..policy import maybe_get_lora
 supported_models = {None}
 
 
-class DS_BloomContainer(MetaTensorContainer, BaseTransformerContainer):
+class DS_BloomContainer(MetaTensorContainer, BaseTransformerContainer, HybridEngineContainer):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -29,6 +30,19 @@ class DS_BloomContainer(MetaTensorContainer, BaseTransformerContainer):
         self.module = DeepSpeedBloomInference(_config, mp_group=self.mp_group)
         self.module.config.scale_attention = self.scale_attention
         return self.module
+
+    def set_lora_params(self):
+        """
+        Necessary to implement for `HybridEngineContainer`
+        """
+        self.lora_params = [
+            maybe_get_lora(p) for p in [
+                self.policy.client_module.self_attention.query_key_value,
+                self.policy.client_module.self_attention.dense,
+                self.policy.client_module.mlp.dense_h_to_4h,
+                self.policy.client_module.mlp.dense_4h_to_h, 
+            ]
+        ]
 
     def attention_qkv_mp(self, mp_replace, reversed_dim=False):
         self.module.attention.attn_qkvw = mp_replace.copy(self.module.attention.attn_qkvw, self.qkvw)
